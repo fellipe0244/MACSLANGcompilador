@@ -1,3 +1,7 @@
-// Exemplo simples: declaracao e impressao de variavel.
+// Teste da sintaxe: variaveis, entrada, atribuicao e print.
 var idade: int = 20;
+var resultado: int = 2 + 3 * 4;
 print(idade);
+input(idade);
+idade = idade + 1;
+print(resultado);

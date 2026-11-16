@@ -3,15 +3,92 @@
 #include <iostream>
 #include <iterator>
 #include <string>
-#include <vector>
 
 #include "Lexer.h"
+#include "Parser.h"
 
-// Ponto de entrada do compilador MACSLang.
-// Recebe o nome do arquivo a ser analisado.
+// Converte o tipo de um no em um nome legivel.
+// Isso facilita visualizar a AST no terminal.
+const char* nomeNo(NodeType tipo) {
+
+    switch (tipo) {
+
+        case NodeType::Program:
+            return "Programa";
+
+        case NodeType::VarDecl:
+            return "Declaracao";
+
+        case NodeType::Assignment:
+            return "Atribuicao";
+
+        case NodeType::Print:
+            return "Print";
+
+        case NodeType::Input:
+            return "Input";
+
+        case NodeType::Identifier:
+            return "Identificador";
+
+        case NodeType::IntegerLiteral:
+            return "Inteiro";
+
+        case NodeType::FloatLiteral:
+            return "Decimal";
+
+        case NodeType::StringLiteral:
+            return "Texto";
+
+        case NodeType::CharLiteral:
+            return "Caractere";
+
+        case NodeType::BoolLiteral:
+            return "Booleano";
+
+        case NodeType::BinaryOp:
+            return "Operacao binaria";
+
+        case NodeType::UnaryOp:
+            return "Operacao unaria";
+
+        default:
+            return "Outro";
+    }
+}
+
+// Percorre a arvore para mostrar seus nos.
+//
+// O nivel controla a indentacao.
+// Cada filho aparece abaixo do no que o possui.
+void mostrarAST(
+    const ASTNode& no,
+    int nivel = 0
+) {
+    std::cout
+        << std::string(nivel * 2, ' ')
+        << nomeNo(no.type);
+
+    if (!no.value.empty()) {
+        std::cout << ": " << no.value;
+    }
+
+    if (!no.dataType.empty()) {
+        std::cout << " [" << no.dataType << "]";
+    }
+
+    std::cout << '\n';
+
+    // Mostra os filhos recursivamente.
+    for (const auto& filho : no.children) {
+        mostrarAST(*filho, nivel + 1);
+    }
+}
+
+// Ponto de entrada do compilador.
 int main(int argc, char* argv[]) {
 
-    // Verifica se o usuario informou o arquivo.
+    // Exige o caminho de um arquivo MACSLang.
     if (argc != 2) {
         std::cerr
             << "Uso: " << argv[0]
@@ -20,10 +97,9 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // Abre o arquivo informado no terminal.
+    // Abre o arquivo informado.
     std::ifstream arquivo(argv[1]);
 
-    // Verifica se foi possivel abrir o arquivo.
     if (!arquivo) {
         std::cerr
             << "Nao foi possivel abrir o arquivo.\n";
@@ -31,7 +107,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // Le todo o conteudo do arquivo.
+    // Carrega o conteudo completo do arquivo.
     std::string codigo(
         (std::istreambuf_iterator<char>(arquivo)),
         std::istreambuf_iterator<char>()
@@ -39,45 +115,36 @@ int main(int argc, char* argv[]) {
 
     try {
 
-        // ETAPA 1 - Analise lexica.
-        // Cria o Lexer utilizando o codigo recebido.
+        // FASE 1 - ANALISE LEXICA
+        // Transforma o codigo-fonte em tokens.
         Lexer lexer(codigo);
 
-        // Executa a analise e recebe os tokens.
-        std::vector<Token> tokens = lexer.analisar();
-
-        // Mostra os tokens para verificar o resultado.
-        // Futuramente, serao enviados ao Parser.
-        for (const Token& token : tokens) {
-
-            // O token EndOfFile indica o fim.
-            if (token.type == TokenType::EndOfFile) {
-                break;
-            }
-
-            // Mostra localizacao, texto e tipo do token.
-            std::cout
-                << "[" << token.line
-                << ":" << token.column << "] "
-                << token.lexeme
-                << " (tipo "
-                << static_cast<int>(token.type)
-                << ")\n";
-        }
+        auto tokens = lexer.analisar();
 
         std::cout
             << "Analise lexica concluida!\n";
 
+        // FASE 2 - ANALISE SINTATICA
+        // Recebe os tokens e constroi a AST.
+        Parser parser(tokens);
+
+        auto arvore = parser.analisar();
+
+        std::cout
+            << "Analise sintatica (parte 1) concluida!\n";
+
+        // Exibe a arvore para testar o Parser.
+        mostrarAST(*arvore);
+
     } catch (const std::exception& erro) {
 
-        // Captura erros encontrados pelo analisador.
+        // Interrompe a compilacao quando ha erro.
         std::cerr
-            << "Erro lexico: "
-            << erro.what() << "\n";
+            << "Erro de compilacao: "
+            << erro.what() << '\n';
 
         return 1;
     }
 
-    // Retorno 0 indica que tudo ocorreu corretamente.
     return 0;
 }
