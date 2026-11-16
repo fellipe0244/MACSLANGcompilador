@@ -1,0 +1,34 @@
+
+/*
+  MACSLang - Teste do analisador lexico
+  Objetivo: verificar os principais tokens da linguagem.
+*/
+
+// Declaracao de variaveis com tipos diferentes
+var idade: int = 20;
+var altura: float = 1.75;
+var inicial: char = 'F';
+var ativo: bool = true;
+var nome: string = "MACSLang";
+
+// Estrutura condicional
+if (idade >= 18 && ativo == true) {
+    print(nome);
+} else {
+    print("Menor de idade");
+}
+
+// Estrutura de repeticao
+var contador: int = 0;
+
+while (contador < 5) {
+    contador = contador + 1;
+}
+
+// Declaracao de funcao
+func soma(a: int, b: int): int {
+    return a + b;
+}
+
+// Chamada de funcao
+print(soma(10, 20));
