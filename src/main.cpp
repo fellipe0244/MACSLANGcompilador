@@ -7,64 +7,42 @@
 #include "Lexer.h"
 #include "Parser.h"
 
-// Converte o tipo de um no em um nome legivel.
-// Isso facilita visualizar a AST no terminal.
+// Traduz os tipos da AST para nomes legiveis.
+// Utilizado apenas para visualizar os testes.
 const char* nomeNo(NodeType tipo) {
 
     switch (tipo) {
 
-        case NodeType::Program:
-            return "Programa";
+        case NodeType::Program: return "Programa";
+        case NodeType::Block: return "Bloco";
+        case NodeType::If: return "If";
+        case NodeType::While: return "While";
 
-        case NodeType::VarDecl:
-            return "Declaracao";
+        case NodeType::VarDecl: return "Declaracao";
+        case NodeType::Assignment: return "Atribuicao";
+        case NodeType::Print: return "Print";
+        case NodeType::Input: return "Input";
 
-        case NodeType::Assignment:
-            return "Atribuicao";
+        case NodeType::Identifier: return "Identificador";
+        case NodeType::IntegerLiteral: return "Inteiro";
+        case NodeType::FloatLiteral: return "Decimal";
+        case NodeType::StringLiteral: return "Texto";
+        case NodeType::CharLiteral: return "Caractere";
+        case NodeType::BoolLiteral: return "Booleano";
 
-        case NodeType::Print:
-            return "Print";
+        case NodeType::BinaryOp: return "Operacao binaria";
+        case NodeType::UnaryOp: return "Operacao unaria";
 
-        case NodeType::Input:
-            return "Input";
-
-        case NodeType::Identifier:
-            return "Identificador";
-
-        case NodeType::IntegerLiteral:
-            return "Inteiro";
-
-        case NodeType::FloatLiteral:
-            return "Decimal";
-
-        case NodeType::StringLiteral:
-            return "Texto";
-
-        case NodeType::CharLiteral:
-            return "Caractere";
-
-        case NodeType::BoolLiteral:
-            return "Booleano";
-
-        case NodeType::BinaryOp:
-            return "Operacao binaria";
-
-        case NodeType::UnaryOp:
-            return "Operacao unaria";
-
-        default:
-            return "Outro";
+        default: return "Outro";
     }
 }
 
-// Percorre a arvore para mostrar seus nos.
+// Mostra a arvore sintatica no terminal.
 //
-// O nivel controla a indentacao.
-// Cada filho aparece abaixo do no que o possui.
-void mostrarAST(
-    const ASTNode& no,
-    int nivel = 0
-) {
+// A funcao percorre todos os filhos de cada no.
+// O nivel determina a indentacao apresentada.
+void mostrarAST(const ASTNode& no, int nivel = 0) {
+
     std::cout
         << std::string(nivel * 2, ' ')
         << nomeNo(no.type);
@@ -79,16 +57,16 @@ void mostrarAST(
 
     std::cout << '\n';
 
-    // Mostra os filhos recursivamente.
+    // Visita os filhos do no atual.
     for (const auto& filho : no.children) {
         mostrarAST(*filho, nivel + 1);
     }
 }
 
-// Ponto de entrada do compilador.
+// Ponto de entrada do compilador MACSLang.
 int main(int argc, char* argv[]) {
 
-    // Exige o caminho de um arquivo MACSLang.
+    // Exige um arquivo informado pelo terminal.
     if (argc != 2) {
         std::cerr
             << "Uso: " << argv[0]
@@ -97,7 +75,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // Abre o arquivo informado.
+    // Abre o arquivo MACSLang.
     std::ifstream arquivo(argv[1]);
 
     if (!arquivo) {
@@ -107,7 +85,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // Carrega o conteudo completo do arquivo.
+    // Carrega todo o codigo-fonte em uma string.
     std::string codigo(
         (std::istreambuf_iterator<char>(arquivo)),
         std::istreambuf_iterator<char>()
@@ -116,7 +94,7 @@ int main(int argc, char* argv[]) {
     try {
 
         // FASE 1 - ANALISE LEXICA
-        // Transforma o codigo-fonte em tokens.
+        // Transforma o codigo em tokens.
         Lexer lexer(codigo);
 
         auto tokens = lexer.analisar();
@@ -125,20 +103,20 @@ int main(int argc, char* argv[]) {
             << "Analise lexica concluida!\n";
 
         // FASE 2 - ANALISE SINTATICA
-        // Recebe os tokens e constroi a AST.
+        // Verifica a estrutura e cria a AST.
         Parser parser(tokens);
 
         auto arvore = parser.analisar();
 
         std::cout
-            << "Analise sintatica (parte 1) concluida!\n";
+            << "Analise sintatica (parte 2) concluida!\n";
 
-        // Exibe a arvore para testar o Parser.
+        // Exibe a AST para verificar a estrutura.
         mostrarAST(*arvore);
 
     } catch (const std::exception& erro) {
 
-        // Interrompe a compilacao quando ha erro.
+        // Interrompe o processo se houver erro.
         std::cerr
             << "Erro de compilacao: "
             << erro.what() << '\n';

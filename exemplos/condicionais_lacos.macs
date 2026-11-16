@@ -1,0 +1,19 @@
+
+// Teste de if, else, while e comparacoes.
+
+var idade: int = 20;
+var ativo: bool = true;
+var contador: int = 0;
+
+// Verifica duas condicoes ao mesmo tempo.
+if (idade >= 18 && ativo == true) {
+    print("Maior e ativo");
+} else {
+    print("Outra situacao");
+}
+
+// Repete enquanto contador for menor que 3.
+while (contador < 3) {
+    contador = contador + 1;
+    print(contador);
+}

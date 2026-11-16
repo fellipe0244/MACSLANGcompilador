@@ -1,12 +1,40 @@
+
 #include "Parser.h"
+
 #include <stdexcept>
 #include <utility>
 
-// Recebe os tokens gerados pelo Lexer.
+// Cria um no de operacao com dois operandos.
+//
+// Exemplo: idade + 1
+//
+// Primeiro filho: operando esquerdo (idade)
+// Segundo filho: operando direito (1)
+static std::unique_ptr<ASTNode> criarBinario(
+    const Token& operador,
+    std::unique_ptr<ASTNode> esquerda,
+    std::unique_ptr<ASTNode> direita
+) {
+    auto no = std::make_unique<ASTNode>(
+        NodeType::BinaryOp,
+        operador.lexeme,
+        "",
+        operador.line,
+        operador.column
+    );
+
+    no->addChild(std::move(esquerda));
+    no->addChild(std::move(direita));
+
+    return no;
+}
+
+// Construtor: recebe a lista de tokens do Lexer.
+//
+// O ultimo token deve indicar o fim do arquivo.
 Parser::Parser(const std::vector<Token>& tokens)
     : tokens(tokens) {
 
-    // A lista deve terminar com EndOfFile.
     if (tokens.empty() ||
         tokens.back().type != TokenType::EndOfFile) {
 
@@ -16,7 +44,7 @@ Parser::Parser(const std::vector<Token>& tokens)
     }
 }
 
-// Consulta o token atual sem avancar.
+// Retorna o token atual sem avancar.
 const Token& Parser::atual() const {
     return tokens[posicao];
 }
@@ -26,7 +54,7 @@ bool Parser::eh(TokenType tipo) const {
     return atual().type == tipo;
 }
 
-// Consome um token quando o tipo corresponde.
+// Consome o token quando corresponde ao esperado.
 bool Parser::aceitar(TokenType tipo) {
 
     if (!eh(tipo)) {
@@ -41,7 +69,9 @@ bool Parser::aceitar(TokenType tipo) {
 }
 
 // Exige um token especifico.
-// Se nao encontrar, gera um erro de sintaxe.
+//
+// Se o token nao corresponder ao esperado,
+// interrompe a analise com erro.
 Token Parser::consumir(
     TokenType tipo,
     const std::string& mensagem
@@ -56,7 +86,7 @@ Token Parser::consumir(
     return token;
 }
 
-// Informa onde ocorreu um erro sintatico.
+// Exibe erros sintaticos com linha e coluna.
 [[noreturn]]
 void Parser::erro(const std::string& mensagem) const {
 
@@ -67,10 +97,10 @@ void Parser::erro(const std::string& mensagem) const {
     );
 }
 
-// Funcao principal do Parser.
+// Inicia o analisador sintatico.
 //
-// Cria a raiz da AST e processa os comandos
-// ate encontrar o final do arquivo.
+// A raiz Program armazena todos os comandos
+// encontrados no codigo-fonte.
 std::unique_ptr<ASTNode> Parser::analisar() {
 
     auto raiz = std::make_unique<ASTNode>(
@@ -84,33 +114,32 @@ std::unique_ptr<ASTNode> Parser::analisar() {
     return raiz;
 }
 
-// Identifica qual comando sera analisado.
+// Identifica o comando que deve ser processado.
 //
-// Nesta primeira parte, os comandos aceitos
-// sao declaracao, atribuicao, print e input.
+// Cada tipo de comando possui uma funcao
+// especifica para reconhecer sua estrutura.
 std::unique_ptr<ASTNode> Parser::comando() {
 
-    if (eh(TokenType::Var)) {
-        return declaracao();
-    }
+    if (eh(TokenType::Var)) return declaracao();
 
-    if (eh(TokenType::Print)) {
-        return impressao();
-    }
+    if (eh(TokenType::Print)) return impressao();
 
-    if (eh(TokenType::Input)) {
-        return entrada();
-    }
+    if (eh(TokenType::Input)) return entrada();
 
-    if (eh(TokenType::Identifier)) {
-        return atribuicao();
-    }
+    if (eh(TokenType::Identifier)) return atribuicao();
 
-    erro("comando inesperado nesta versao do Parser");
+    if (eh(TokenType::LeftBrace)) return bloco();
+
+    if (eh(TokenType::If)) return condicional();
+
+    if (eh(TokenType::While)) return repeticaoWhile();
+
+    erro("comando inesperado ou ainda nao implementado");
 }
 
-// Reconhece declaracoes como:
-// var idade: int = 20;
+// Reconhece declaracoes de variaveis.
+//
+// Exemplo: var idade: int = 20;
 //
 // O valor inicial e opcional.
 std::unique_ptr<ASTNode> Parser::declaracao() {
@@ -130,8 +159,7 @@ std::unique_ptr<ASTNode> Parser::declaracao() {
         "esperado ':' depois do nome"
     );
 
-    // Verifica se foi informado um dos cinco
-    // tipos definidos pela linguagem MACSLang.
+    // Verifica se existe um tipo valido.
     if (!eh(TokenType::Int) &&
         !eh(TokenType::Float) &&
         !eh(TokenType::Char) &&
@@ -147,7 +175,6 @@ std::unique_ptr<ASTNode> Parser::declaracao() {
     Token tipo = atual();
     aceitar(tipo.type);
 
-    // Cria o no da declaracao.
     auto no = std::make_unique<ASTNode>(
         NodeType::VarDecl,
         nome.lexeme,
@@ -156,13 +183,11 @@ std::unique_ptr<ASTNode> Parser::declaracao() {
         inicio.column
     );
 
-    // Se houver '=' processa o valor inicial.
-    // A expressao sera o primeiro filho do no.
+    // O valor inicial fica no primeiro filho.
     if (aceitar(TokenType::Equal)) {
         no->addChild(expressao());
     }
 
-    // Toda declaracao termina com ';'.
     consumir(
         TokenType::Semicolon,
         "esperado ';' depois da declaracao"
@@ -171,8 +196,9 @@ std::unique_ptr<ASTNode> Parser::declaracao() {
     return no;
 }
 
-// Reconhece atribuicoes como:
-// idade = idade + 1;
+// Reconhece atribuicoes.
+//
+// Exemplo: idade = idade + 1;
 std::unique_ptr<ASTNode> Parser::atribuicao() {
 
     Token nome = consumir(
@@ -193,7 +219,7 @@ std::unique_ptr<ASTNode> Parser::atribuicao() {
         nome.column
     );
 
-    // A expressao atribuida sera o primeiro filho.
+    // A expressao atribuida fica no primeiro filho.
     no->addChild(expressao());
 
     consumir(
@@ -204,9 +230,9 @@ std::unique_ptr<ASTNode> Parser::atribuicao() {
     return no;
 }
 
-// Reconhece o comando de saida:
-// print(idade);
-// print(10 + 5);
+// Reconhece o comando de saida.
+//
+// Exemplo: print(idade);
 std::unique_ptr<ASTNode> Parser::impressao() {
 
     Token inicio = consumir(
@@ -227,7 +253,6 @@ std::unique_ptr<ASTNode> Parser::impressao() {
         inicio.column
     );
 
-    // A expressao impressa fica no primeiro filho.
     no->addChild(expressao());
 
     consumir(
@@ -243,8 +268,9 @@ std::unique_ptr<ASTNode> Parser::impressao() {
     return no;
 }
 
-// Reconhece o comando de entrada:
-// input(idade);
+// Reconhece o comando de entrada.
+//
+// Exemplo: input(idade);
 std::unique_ptr<ASTNode> Parser::entrada() {
 
     Token inicio = consumir(
@@ -259,7 +285,7 @@ std::unique_ptr<ASTNode> Parser::entrada() {
 
     Token nome = consumir(
         TokenType::Identifier,
-        "esperado nome da variavel em input"
+        "esperado nome em input"
     );
 
     consumir(
@@ -272,7 +298,6 @@ std::unique_ptr<ASTNode> Parser::entrada() {
         "esperado ';' depois de input"
     );
 
-    // O nome da variavel fica no campo value.
     return std::make_unique<ASTNode>(
         NodeType::Input,
         nome.lexeme,
@@ -282,11 +307,245 @@ std::unique_ptr<ASTNode> Parser::entrada() {
     );
 }
 
-// Analisa soma e subtracao.
+// Reconhece blocos delimitados por chaves.
 //
-// Primeiro processamos multiplicacoes para
-// respeitar a prioridade das operacoes.
+// Exemplo:
+// {
+//     var x: int = 10;
+//     print(x);
+// }
+//
+// Cada comando vira um filho do no Block.
+std::unique_ptr<ASTNode> Parser::bloco() {
+
+    Token inicio = consumir(
+        TokenType::LeftBrace,
+        "esperado '{' para abrir bloco"
+    );
+
+    auto no = std::make_unique<ASTNode>(
+        NodeType::Block,
+        "",
+        "",
+        inicio.line,
+        inicio.column
+    );
+
+    // Processa comandos ate encontrar a chave final.
+    while (!eh(TokenType::RightBrace) &&
+           !eh(TokenType::EndOfFile)) {
+
+        no->addChild(comando());
+    }
+
+    // Um bloco aberto precisa ser fechado.
+    consumir(
+        TokenType::RightBrace,
+        "esperado '}' para fechar bloco"
+    );
+
+    return no;
+}
+
+// Reconhece condicionais if/else.
+//
+// Exemplo:
+// if (idade >= 18) {
+//     print("Maior");
+// } else {
+//     print("Menor");
+// }
+//
+// AST:
+// filho[0] = condicao
+// filho[1] = bloco do if
+// filho[2] = bloco do else (opcional)
+std::unique_ptr<ASTNode> Parser::condicional() {
+
+    Token inicio = consumir(
+        TokenType::If,
+        "esperado 'if'"
+    );
+
+    consumir(
+        TokenType::LeftParen,
+        "esperado '(' depois de if"
+    );
+
+    auto no = std::make_unique<ASTNode>(
+        NodeType::If,
+        "",
+        "",
+        inicio.line,
+        inicio.column
+    );
+
+    // Analisa a expressao da condicao.
+    no->addChild(expressao());
+
+    consumir(
+        TokenType::RightParen,
+        "esperado ')' depois da condicao"
+    );
+
+    // O corpo do if precisa ter chaves.
+    no->addChild(bloco());
+
+    // O else e opcional.
+    if (aceitar(TokenType::Else)) {
+        no->addChild(bloco());
+    }
+
+    return no;
+}
+
+// Reconhece repeticoes while.
+//
+// Exemplo:
+// while (contador < 5) {
+//     contador = contador + 1;
+// }
+//
+// AST:
+// filho[0] = condicao
+// filho[1] = bloco de repeticao
+std::unique_ptr<ASTNode> Parser::repeticaoWhile() {
+
+    Token inicio = consumir(
+        TokenType::While,
+        "esperado 'while'"
+    );
+
+    consumir(
+        TokenType::LeftParen,
+        "esperado '(' depois de while"
+    );
+
+    auto no = std::make_unique<ASTNode>(
+        NodeType::While,
+        "",
+        "",
+        inicio.line,
+        inicio.column
+    );
+
+    // Condicao que controla a repeticao.
+    no->addChild(expressao());
+
+    consumir(
+        TokenType::RightParen,
+        "esperado ')' depois da condicao"
+    );
+
+    // Comandos executados durante a repeticao.
+    no->addChild(bloco());
+
+    return no;
+}
+
+// Inicia a analise de expressoes.
+//
+// Comecamos pelo operador de menor prioridade.
 std::unique_ptr<ASTNode> Parser::expressao() {
+    return logicoOu();
+}
+
+// Reconhece o operador logico OU.
+//
+// Exemplo: ativo || autorizado
+std::unique_ptr<ASTNode> Parser::logicoOu() {
+
+    auto esquerda = logicoE();
+
+    while (eh(TokenType::OrOr)) {
+
+        Token operador = atual();
+        aceitar(operador.type);
+
+        esquerda = criarBinario(
+            operador,
+            std::move(esquerda),
+            logicoE()
+        );
+    }
+
+    return esquerda;
+}
+
+// Reconhece o operador logico E.
+//
+// Exemplo: idade >= 18 && ativo
+std::unique_ptr<ASTNode> Parser::logicoE() {
+
+    auto esquerda = igualdade();
+
+    while (eh(TokenType::AndAnd)) {
+
+        Token operador = atual();
+        aceitar(operador.type);
+
+        esquerda = criarBinario(
+            operador,
+            std::move(esquerda),
+            igualdade()
+        );
+    }
+
+    return esquerda;
+}
+
+// Reconhece igualdade e diferenca.
+//
+// Operadores: == e !=
+std::unique_ptr<ASTNode> Parser::igualdade() {
+
+    auto esquerda = comparacao();
+
+    while (eh(TokenType::EqualEqual) ||
+           eh(TokenType::BangEqual)) {
+
+        Token operador = atual();
+        aceitar(operador.type);
+
+        esquerda = criarBinario(
+            operador,
+            std::move(esquerda),
+            comparacao()
+        );
+    }
+
+    return esquerda;
+}
+
+// Reconhece comparacoes.
+//
+// Operadores: <, <=, > e >=
+std::unique_ptr<ASTNode> Parser::comparacao() {
+
+    auto esquerda = soma();
+
+    while (eh(TokenType::Less) ||
+           eh(TokenType::LessEqual) ||
+           eh(TokenType::Greater) ||
+           eh(TokenType::GreaterEqual)) {
+
+        Token operador = atual();
+        aceitar(operador.type);
+
+        esquerda = criarBinario(
+            operador,
+            std::move(esquerda),
+            soma()
+        );
+    }
+
+    return esquerda;
+}
+
+// Reconhece soma e subtracao.
+//
+// Possuem prioridade menor que * e /.
+std::unique_ptr<ASTNode> Parser::soma() {
 
     auto esquerda = multiplicacao();
 
@@ -296,33 +555,21 @@ std::unique_ptr<ASTNode> Parser::expressao() {
         Token operador = atual();
         aceitar(operador.type);
 
-        auto direita = multiplicacao();
-
-        auto no = std::make_unique<ASTNode>(
-            NodeType::BinaryOp,
-            operador.lexeme,
-            "",
-            operador.line,
-            operador.column
+        esquerda = criarBinario(
+            operador,
+            std::move(esquerda),
+            multiplicacao()
         );
-
-        // Primeiro filho: operando esquerdo.
-        no->addChild(std::move(esquerda));
-
-        // Segundo filho: operando direito.
-        no->addChild(std::move(direita));
-
-        // O resultado se torna a nova expressao.
-        esquerda = std::move(no);
     }
 
     return esquerda;
 }
 
-// Processa multiplicacao e divisao.
+// Reconhece multiplicacao e divisao.
 //
-// Essas operacoes possuem prioridade
-// maior que soma e subtracao.
+// Exemplo: 2 + 3 * 4
+//
+// A multiplicacao sera analisada antes da soma.
 std::unique_ptr<ASTNode> Parser::multiplicacao() {
 
     auto esquerda = unario();
@@ -333,20 +580,11 @@ std::unique_ptr<ASTNode> Parser::multiplicacao() {
         Token operador = atual();
         aceitar(operador.type);
 
-        auto direita = unario();
-
-        auto no = std::make_unique<ASTNode>(
-            NodeType::BinaryOp,
-            operador.lexeme,
-            "",
-            operador.line,
-            operador.column
+        esquerda = criarBinario(
+            operador,
+            std::move(esquerda),
+            unario()
         );
-
-        no->addChild(std::move(esquerda));
-        no->addChild(std::move(direita));
-
-        esquerda = std::move(no);
     }
 
     return esquerda;
@@ -357,10 +595,12 @@ std::unique_ptr<ASTNode> Parser::multiplicacao() {
 // Exemplos:
 // -5
 // +10
+// !ativo
 std::unique_ptr<ASTNode> Parser::unario() {
 
-    if (eh(TokenType::Minus) ||
-        eh(TokenType::Plus)) {
+    if (eh(TokenType::Plus) ||
+        eh(TokenType::Minus) ||
+        eh(TokenType::Bang)) {
 
         Token operador = atual();
         aceitar(operador.type);
@@ -381,54 +621,55 @@ std::unique_ptr<ASTNode> Parser::unario() {
     return primario();
 }
 
-// Identifica os valores mais simples.
+// Reconhece elementos basicos.
 //
 // Exemplos:
 // 20
 // 1.75
 // "Ola"
+// true
 // idade
 // (2 + 3)
 std::unique_ptr<ASTNode> Parser::primario() {
 
     Token token = atual();
 
-    NodeType noTipo;
-    std::string dado;
+    NodeType tipo;
+    std::string tipoDado;
 
     switch (token.type) {
 
         case TokenType::Identifier:
-            noTipo = NodeType::Identifier;
+            tipo = NodeType::Identifier;
             break;
 
         case TokenType::IntegerLiteral:
-            noTipo = NodeType::IntegerLiteral;
-            dado = "int";
+            tipo = NodeType::IntegerLiteral;
+            tipoDado = "int";
             break;
 
         case TokenType::FloatLiteral:
-            noTipo = NodeType::FloatLiteral;
-            dado = "float";
+            tipo = NodeType::FloatLiteral;
+            tipoDado = "float";
             break;
 
         case TokenType::StringLiteral:
-            noTipo = NodeType::StringLiteral;
-            dado = "string";
+            tipo = NodeType::StringLiteral;
+            tipoDado = "string";
             break;
 
         case TokenType::CharLiteral:
-            noTipo = NodeType::CharLiteral;
-            dado = "char";
+            tipo = NodeType::CharLiteral;
+            tipoDado = "char";
             break;
 
         case TokenType::True:
         case TokenType::False:
-            noTipo = NodeType::BoolLiteral;
-            dado = "bool";
+            tipo = NodeType::BoolLiteral;
+            tipoDado = "bool";
             break;
 
-        // Expressoes entre parenteses.
+        // Expressao entre parenteses.
         case TokenType::LeftParen: {
 
             aceitar(TokenType::LeftParen);
@@ -445,17 +686,17 @@ std::unique_ptr<ASTNode> Parser::primario() {
 
         default:
             erro(
-                "esperado um valor, variavel "
-                "ou '(' na expressao"
+                "esperado valor, variavel ou "
+                "'(' na expressao"
             );
     }
 
     aceitar(token.type);
 
     return std::make_unique<ASTNode>(
-        noTipo,
+        tipo,
         token.lexeme,
-        dado,
+        tipoDado,
         token.line,
         token.column
     );

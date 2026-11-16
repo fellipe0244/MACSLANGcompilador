@@ -10,29 +10,34 @@
 #include "AST.h"
 #include "Token.h"
 
-// Analisa a ordem dos tokens e cria a arvore sintatica.
+// FASE 2 - ANALISE SINTATICA
 //
-// Nesta primeira parte reconhecemos:
-// - Declaracao de variaveis
-// - Atribuicao de valores
+// Recebe os tokens gerados pelo Lexer,
+// verifica a estrutura dos comandos e cria a AST.
+//
+// Nesta etapa reconhecemos:
+// - Declaracoes de variaveis e atribuicoes
 // - Comandos print e input
-// - Expressoes aritmeticas
+// - Blocos de codigo
+// - Condicionais if/else
+// - Repeticao while
+// - Expressoes aritmeticas, logicas e comparacoes
 class Parser {
 public:
 
-    // Recebe a lista de tokens produzida pelo Lexer.
+    // Recebe os tokens, incluindo EndOfFile.
     explicit Parser(const std::vector<Token>& tokens);
 
-    // Inicia a analise sintatica.
-    // Retorna a raiz da AST ou gera um erro.
+    // Executa a analise sintatica.
+    // Retorna a AST ou gera um erro.
     std::unique_ptr<ASTNode> analisar();
 
 private:
 
-    // Referencia para os tokens recebidos.
+    // Lista de tokens recebida do Lexer.
     const std::vector<Token>& tokens;
 
-    // Posicao atual na lista de tokens.
+    // Posicao atual durante a leitura.
     std::size_t posicao = 0;
 
     // Funcoes auxiliares de leitura.
@@ -40,13 +45,13 @@ private:
     bool eh(TokenType tipo) const;
     bool aceitar(TokenType tipo);
 
-    // Exige um token especifico.
+    // Exige determinado token.
     Token consumir(
         TokenType tipo,
         const std::string& mensagem
     );
 
-    // Mostra erros de sintaxe com linha e coluna.
+    // Apresenta erros com linha e coluna.
     [[noreturn]]
     void erro(const std::string& mensagem) const;
 
@@ -57,8 +62,19 @@ private:
     std::unique_ptr<ASTNode> impressao();
     std::unique_ptr<ASTNode> entrada();
 
-    // Reconhecimento de expressoes matematicas.
+    // Estruturas de controle.
+    std::unique_ptr<ASTNode> bloco();
+    std::unique_ptr<ASTNode> condicional();
+    std::unique_ptr<ASTNode> repeticaoWhile();
+
+    // Analise de expressoes em ordem
+    // crescente de prioridade.
     std::unique_ptr<ASTNode> expressao();
+    std::unique_ptr<ASTNode> logicoOu();
+    std::unique_ptr<ASTNode> logicoE();
+    std::unique_ptr<ASTNode> igualdade();
+    std::unique_ptr<ASTNode> comparacao();
+    std::unique_ptr<ASTNode> soma();
     std::unique_ptr<ASTNode> multiplicacao();
     std::unique_ptr<ASTNode> unario();
     std::unique_ptr<ASTNode> primario();

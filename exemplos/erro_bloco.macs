@@ -1,0 +1,4 @@
+var contador: int = 0;
+
+while (contador < 3) {
+    contador = contador + 1;
