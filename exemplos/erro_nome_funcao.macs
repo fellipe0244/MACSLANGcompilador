@@ -1,0 +1,7 @@
+var f: int = 3;
+
+func f(n: int): int {
+    return n + 1;
+}
+
+print(f(1));

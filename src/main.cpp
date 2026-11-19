@@ -6,36 +6,32 @@
 
 #include "Lexer.h"
 #include "Parser.h"
+#include "Semantic.h"
 
-// Converte os tipos de nos da AST em nomes legiveis.
-// Isso facilita visualizar o resultado no terminal.
+// Traduz os tipos da AST para nomes legiveis.
 const char* nomeNo(NodeType tipo) {
+
     switch (tipo) {
 
-        // Estrutura do programa
         case NodeType::Program: return "Programa";
         case NodeType::Block: return "Bloco";
-
-        // Estruturas de controle
         case NodeType::If: return "If";
         case NodeType::While: return "While";
         case NodeType::For: return "For";
 
-        // Funcoes
         case NodeType::Function: return "Funcao";
         case NodeType::Parameter: return "Parametro";
         case NodeType::Return: return "Return";
         case NodeType::Call: return "Chamada";
+
         case NodeType::ExpressionStatement:
             return "Comando de chamada";
 
-        // Comandos comuns
         case NodeType::VarDecl: return "Declaracao";
         case NodeType::Assignment: return "Atribuicao";
         case NodeType::Print: return "Print";
         case NodeType::Input: return "Input";
 
-        // Valores e identificadores
         case NodeType::Identifier: return "Identificador";
         case NodeType::IntegerLiteral: return "Inteiro";
         case NodeType::FloatLiteral: return "Decimal";
@@ -43,7 +39,6 @@ const char* nomeNo(NodeType tipo) {
         case NodeType::CharLiteral: return "Caractere";
         case NodeType::BoolLiteral: return "Booleano";
 
-        // Operacoes
         case NodeType::BinaryOp: return "Operacao binaria";
         case NodeType::UnaryOp: return "Operacao unaria";
 
@@ -51,41 +46,34 @@ const char* nomeNo(NodeType tipo) {
     }
 }
 
-// Percorre a AST e mostra sua estrutura.
-//
-// Quanto maior o nivel, maior sera a indentacao.
-// Isso permite visualizar a relacao entre os nos.
+// Exibe os nos da AST com indentacao.
+// Cada nivel representa um nivel da arvore.
 void mostrarAST(const ASTNode& no, int nivel = 0) {
 
     std::cout
         << std::string(nivel * 2, ' ')
         << nomeNo(no.type);
 
-    // Mostra o nome, valor ou operador.
     if (!no.value.empty()) {
         std::cout << ": " << no.value;
     }
 
-    // Mostra o tipo de dado, quando existir.
     if (!no.dataType.empty()) {
         std::cout << " [" << no.dataType << "]";
     }
 
     std::cout << '\n';
 
-    // Percorre recursivamente os filhos do no.
+    // Percorre recursivamente os filhos.
     for (const auto& filho : no.children) {
         mostrarAST(*filho, nivel + 1);
     }
 }
 
-// Funcao principal do compilador MACSLang.
-//
-// Recebe o caminho do arquivo .macs informado
-// pelo usuario no terminal.
+// Ponto de entrada do compilador MACSLang.
 int main(int argc, char* argv[]) {
 
-    // Verifica se foi informado um arquivo.
+    // Exige um arquivo .macs como argumento.
     if (argc != 2) {
         std::cerr
             << "Uso: " << argv[0]
@@ -94,7 +82,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // Abre o arquivo de codigo-fonte.
+    // Abre o arquivo de entrada.
     std::ifstream arquivo(argv[1]);
 
     if (!arquivo) {
@@ -104,7 +92,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // Le todo o conteudo do arquivo.
+    // Carrega o codigo-fonte completo.
     std::string codigo(
         (std::istreambuf_iterator<char>(arquivo)),
         std::istreambuf_iterator<char>()
@@ -115,25 +103,36 @@ int main(int argc, char* argv[]) {
         // FASE 1 - ANALISE LEXICA
         // Transforma o codigo-fonte em tokens.
         Lexer lexer(codigo);
+
         auto tokens = lexer.analisar();
 
         std::cout
             << "Analise lexica concluida!\n";
 
         // FASE 2 - ANALISE SINTATICA
-        // Verifica a estrutura dos tokens e monta a AST.
+        // Verifica a estrutura e cria a AST.
         Parser parser(tokens);
+
         auto arvore = parser.analisar();
 
         std::cout
             << "Analise sintatica (parte 3) concluida!\n";
 
-        // Apresenta a estrutura da AST no terminal.
+        // Mostra a arvore para facilitar os testes.
         mostrarAST(*arvore);
+
+        // FASE 3 - ANALISE SEMANTICA
+        // Verifica tipos, variaveis, escopos e funcoes.
+        Semantic semantico;
+
+        semantico.analisar(*arvore);
+
+        std::cout
+            << "Analise semantica concluida!\n";
 
     } catch (const std::exception& erro) {
 
-        // Interrompe a compilacao se encontrar erro.
+        // Interrompe o compilador caso encontre erro.
         std::cerr
             << "Erro de compilacao: "
             << erro.what() << '\n';
@@ -141,6 +140,5 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // Codigo 0 significa encerramento sem erros.
     return 0;
 }

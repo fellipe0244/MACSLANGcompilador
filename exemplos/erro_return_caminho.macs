@@ -1,0 +1,7 @@
+func avaliar(n: int): int {
+    if (n > 0) {
+        return n;
+    }
+}
+
+print(avaliar(3));
